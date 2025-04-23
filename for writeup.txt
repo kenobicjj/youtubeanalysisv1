@@ -1,0 +1,14 @@
+started with deepseek
+Deepseek got stuck at debugging youtube download
+- Pytube doesn't work
+- Switched to pytube3, also doesn't work
+- Switched to yt_dlp, but cannot get the program to display the debug code to show the issue
+
+Deepseek server got slow due to network utilisation (probably more users coming on)
+Switched to github copilot, running GPT-4.1
+
+Opened folder in VS, it showed me how to do a trace for the error messages leading up to the HTTP 500 errors.
+- turns out Whisper uses ffmpeg. Unfortunately unable to install ffmpeg both using gyan dev build (can extract but cannot alter environment path due to admin restrictions), neither was able to install chocolatey as it requires admin for ps1 installation as well.
+- copilot suggested to use os.environment and point it at my ffmpeg installation. Need to watch out for this when doing transfer to other machines.
+
+Continued on development with copilot, added extra RAG, routes to verify status between download, transcribing audio, extract frames, describe frames and summarising with gemma.

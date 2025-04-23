@@ -1,0 +1,6 @@
+youtube-summarizer/
+│── app.py                   # Flask backend
+│── utils.py                 # Helper functions (video/audio processing)
+│── requirements.txt         # Python dependencies
+│── templates/
+│   └── index.html           # Frontend (form + chat)

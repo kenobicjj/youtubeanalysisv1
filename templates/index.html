@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Summarizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
+        <h1 class="text-2xl font-bold mb-4">YouTube Summarizer</h1>
+        
+        <form id="youtube-form" class="mb-6">
+            <input 
+                type="text" 
+                id="youtube-url" 
+                name="youtube_url"
+                placeholder="Enter YouTube URL" 
+                class="w-full p-2 border rounded"
+                required
+            >
+            <button 
+                type="submit" 
+                class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+                Summarize
+            </button>
+        </form>
+        <!-- Add this inside your main container -->
+        <div id="status" class="mb-4 p-2 bg-yellow-100 rounded text-yellow-800 hidden"></div>
+        <div id="summary" class="mb-6 p-4 bg-gray-50 rounded hidden">
+            <h2 class="font-bold mb-2">Summary:</h2>
+            <p id="summary-text"></p>
+        </div>
+        
+        <div id="chat" class="hidden">
+            <h2 class="font-bold mb-2">Ask a Question:</h2>
+            <form id="chat-form" class="flex mb-4">
+                <input 
+                    type="text" 
+                    id="question" 
+                    placeholder="Ask about the video..." 
+                    class="flex-1 p-2 border rounded"
+                    required
+                >
+                <button 
+                    type="submit" 
+                    class="ml-2 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                >
+                    Ask
+                </button>
+            </form>
+            <div id="chat-response" class="p-4 bg-gray-50 rounded"></div>
+        </div>
+        <!-- Add below the reset button -->
+        <button id="load-btn" class="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+            Load Last Session
+        </button>
+        <!-- Add this button in your HTML, e.g. below the chat div -->
+        <button id="reset-btn" class="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+            Reset Session
+        </button>
+    </div>
+
+    <script>
+        const youtubeForm = document.getElementById("youtube-form");
+        const chatForm = document.getElementById("chat-form");
+        const summaryDiv = document.getElementById("summary");
+        const chatDiv = document.getElementById("chat");
+
+        youtubeForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const url = document.getElementById("youtube-url").value;
+
+            try {
+                setStatus("Uploading and processing video...");
+                startStatusPolling();
+                const response = await fetch("/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: `youtube_url=${encodeURIComponent(url)}`,
+                });
+
+                stopStatusPolling();
+
+                if (!response.ok) {
+                    clearStatus();
+                    const error = await response.json();
+                    throw new Error(error.error || "Video unavailable");
+                }
+
+                const data = await response.json();
+                clearStatus();
+
+                // Display summary and chat
+                document.getElementById("summary-text").textContent = data.summary;
+                document.getElementById("summary").classList.remove("hidden");
+                document.getElementById("chat").classList.remove("hidden");
+
+            } catch (err) {
+                stopStatusPolling();
+                setStatus("Error: " + err.message);
+                console.error(err);
+            }
+        });
+        chatForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const question = document.getElementById("question").value;
+            
+            const response = await fetch("/ask", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ question }),
+            });
+            
+            const data = await response.json();
+            document.getElementById("chat-response").innerHTML += `
+                <p class="font-semibold">You: ${question}</p>
+                <p class="mb-2">AI: ${data.answer}</p>
+            `;
+            document.getElementById("question").value = "";
+        });
+
+        document.getElementById("reset-btn").addEventListener("click", async () => {
+            await fetch("/reset", { method: "POST" });
+            document.getElementById("summary").classList.add("hidden");
+            document.getElementById("chat").classList.add("hidden");
+            document.getElementById("summary-text").textContent = "";
+            document.getElementById("chat-response").innerHTML = "";
+            document.getElementById("youtube-url").value = "";
+        });
+
+        document.getElementById("load-btn").addEventListener("click", async () => {
+            const res = await fetch("/load", { method: "POST" });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById("summary-text").textContent = data.summary;
+                document.getElementById("summary").classList.remove("hidden");
+                document.getElementById("chat").classList.remove("hidden");
+                setStatus("Last session loaded.");
+            } else {
+                setStatus(data.error || "No saved session found.");
+            }
+        });
+
+        let statusInterval = null;
+
+        function startStatusPolling() {
+            statusInterval = setInterval(async () => {
+                const res = await fetch("/status");
+                const data = await res.json();
+                setStatus(data.status);
+            }, 1000);
+        }
+
+        function stopStatusPolling() {
+            clearInterval(statusInterval);
+            clearStatus();
+        }
+
+        function setStatus(msg) {
+            const statusDiv = document.getElementById("status");
+            statusDiv.textContent = msg;
+            statusDiv.classList.remove("hidden");
+        }
+
+        function clearStatus() {
+            document.getElementById("status").classList.add("hidden");
+        }
+    </script>
+</body>
+</html>
