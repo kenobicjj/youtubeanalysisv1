@@ -27,7 +27,10 @@
             </button>
         </form>
         <!-- Add this inside your main container -->
-        <div id="status" class="mb-4 p-2 bg-yellow-100 rounded text-yellow-800 hidden"></div>
+        <div id="status" class="mb-4 p-2 bg-yellow-100 rounded text-yellow-800 hidden flex items-center justify-between">
+            <span id="status-text"></span>
+            <button id="terminate-btn" class="ml-4 bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 hidden">Terminate</button>
+        </div>
         <div id="summary" class="mb-6 p-4 bg-gray-50 rounded hidden">
             <h2 class="font-bold mb-2">Summary:</h2>
             <p id="summary-text"></p>
@@ -71,38 +74,56 @@
         youtubeForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const url = document.getElementById("youtube-url").value;
-
+            const summarizeBtn = youtubeForm.querySelector("button[type='submit']");
+            const urlInput = document.getElementById("youtube-url");
+            // Lock the UI
+            lockUI();
+            setStatus("Uploading and processing video...");
+            startStatusPolling();
             try {
-                setStatus("Uploading and processing video...");
-                startStatusPolling();
                 const response = await fetch("/", {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
                     body: `youtube_url=${encodeURIComponent(url)}`,
                 });
-
-                stopStatusPolling();
-
                 if (!response.ok) {
+                    stopStatusPolling();
                     clearStatus();
                     const error = await response.json();
                     throw new Error(error.error || "Video unavailable");
                 }
-
-                const data = await response.json();
-                clearStatus();
-
-                // Display summary and chat
-                document.getElementById("summary-text").textContent = data.summary;
-                document.getElementById("summary").classList.remove("hidden");
-                document.getElementById("chat").classList.remove("hidden");
-
+                // Wait for analysis to complete by polling status
+                let done = false;
+                while (!done) {
+                    const statusRes = await fetch("/status");
+                    const statusData = await statusRes.json();
+                    setStatus(statusData.status);
+                    if (statusData.status && statusData.status.toLowerCase().includes("complete")) {
+                        done = true;
+                    } else if (statusData.status && statusData.status.toLowerCase().includes("error")) {
+                        throw new Error(statusData.status);
+                    } else {
+                        await new Promise(r => setTimeout(r, 1500));
+                    }
+                }
+                // Fetch summary after completion
+                const loadRes = await fetch("/load", { method: "POST" });
+                const loadData = await loadRes.json();
+                if (loadData.success) {
+                    document.getElementById("summary-text").textContent = loadData.summary;
+                    document.getElementById("summary").classList.remove("hidden");
+                    document.getElementById("chat").classList.remove("hidden");
+                }
+                setStatus("Analysis complete.");
             } catch (err) {
-                stopStatusPolling();
                 setStatus("Error: " + err.message);
                 console.error(err);
+            } finally {
+                stopStatusPolling();
+                unlockUI();
             }
         });
+
         chatForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const question = document.getElementById("question").value;
@@ -145,6 +166,13 @@
             }
         });
 
+        document.getElementById("terminate-btn").addEventListener("click", async () => {
+            await fetch("/terminate", { method: "POST" });
+            setStatus("Analysis terminated by user.");
+            stopStatusPolling();
+            unlockUI();
+        });
+
         let statusInterval = null;
 
         function startStatusPolling() {
@@ -162,12 +190,47 @@
 
         function setStatus(msg) {
             const statusDiv = document.getElementById("status");
-            statusDiv.textContent = msg;
+            const statusText = document.getElementById("status-text");
+            statusText.textContent = msg;
             statusDiv.classList.remove("hidden");
+            // Show terminate button if processing
+            const isProcessing = msg && msg.toLowerCase().includes("processing");
+            document.getElementById("terminate-btn").classList.toggle("hidden", !isProcessing);
+            // Disable chat and other buttons if processing
+            document.getElementById("question").disabled = isProcessing;
+            document.getElementById("chat-form").querySelector("button[type='submit']").disabled = isProcessing;
+            document.getElementById("reset-btn").disabled = isProcessing;
+            document.getElementById("load-btn").disabled = isProcessing;
         }
 
         function clearStatus() {
             document.getElementById("status").classList.add("hidden");
+            document.getElementById("terminate-btn").classList.add("hidden");
+            // Re-enable chat and other buttons
+            document.getElementById("question").disabled = false;
+            document.getElementById("chat-form").querySelector("button[type='submit']").disabled = false;
+            document.getElementById("reset-btn").disabled = false;
+            document.getElementById("load-btn").disabled = false;
+        }
+
+        function lockUI() {
+            document.getElementById("youtube-url").disabled = true;
+            youtubeForm.querySelector("button[type='submit']").disabled = true;
+            youtubeForm.querySelector("button[type='submit']").classList.add("opacity-50", "cursor-not-allowed");
+            document.getElementById("question").disabled = true;
+            document.getElementById("chat-form").querySelector("button[type='submit']").disabled = true;
+            document.getElementById("reset-btn").disabled = true;
+            document.getElementById("load-btn").disabled = true;
+        }
+
+        function unlockUI() {
+            document.getElementById("youtube-url").disabled = false;
+            youtubeForm.querySelector("button[type='submit']").disabled = false;
+            youtubeForm.querySelector("button[type='submit']").classList.remove("opacity-50", "cursor-not-allowed");
+            document.getElementById("question").disabled = false;
+            document.getElementById("chat-form").querySelector("button[type='submit']").disabled = false;
+            document.getElementById("reset-btn").disabled = false;
+            document.getElementById("load-btn").disabled = false;
         }
     </script>
 </body>
