@@ -1,7 +1,9 @@
-# YouTubeDeepSeek
+# YouTube Frame Analyser
 
-YouTubeDeepSeek is a Flask-based application that processes YouTube videos to extract transcripts, summarize content, and enable interactive Q&A using a multimodal Retrieval-Augmented Generation (RAG) pipeline. The application integrates video frame extraction, audio transcription, and embedding-based retrieval for efficient question answering.
-
+YouTube Frame Analyser is a Flask-based application that processes YouTube videos to extract transcripts, summarize content, and enable interactive Q&A using a multimodal Retrieval-Augmented Generation (RAG) pipeline. The application integrates video frame extraction, audio transcription, and embedding-based retrieval for efficient question answering.
+![YouTube Frame Class Diagram](images/youtube-frame_classdiagram.png)
+![YouTube Frame Sequence Diagram](images/youtube-frame_sequence.png)
+![YouTube Frame screenshot](images/youtubeFrame.jpg)
 ---
 
 ## Features
